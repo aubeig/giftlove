@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Подарок для Алисы</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Pacifico&family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        :root {
+            /* База квеста */
+            --sky-blue: #e0f2fe;
+            --accent-blue: #0ea5e9;
+            --glass-card: rgba(255, 255, 255, 0.95);
+            
+            /* Динамический остров & MD3 System */
+            --island-bg: #0b0b0b;
+            --island-border: rgba(255, 255, 255, 0.1);
+            --ease-apple: cubic-bezier(0.25, 1, 0.3, 1);
+        }
+
+        body {
+            background-color: var(--sky-blue); font-family: 'Comfortaa', cursive;
+            margin: 0; overflow: hidden; color: #0f172a;
+            user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+
+        .font-pacifico { font-family: 'Pacifico', cursive; }
+
+        #bg-elements { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+        
+        #preloader { position: fixed; inset: 0; background-color: var(--sky-blue); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.6s ease; }
+
+        .stage { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10; opacity: 0; transition: opacity 0.4s ease; }
+        .stage.active { display: flex; opacity: 1; }
+
+        .glass-container {
+            background: var(--glass-card); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border-radius: 36px; border: 3px solid rgba(255,255,255,0.7); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+            width: 90%; max-width: 450px; padding: 30px 25px; text-align: center;
+            margin-top: 60px; max-height: 75vh; display: flex; flex-direction: column; position: relative;
+        }
+
+        #q-options { overflow-y: auto; overflow-x: hidden; padding-bottom: 5px; margin-top: auto; display: flex; flex-direction: column; gap: 12px; }
+
+        @keyframes btnFlyIn { 0% { opacity: 0; transform: translateY(15px); } 100% { opacity: 1; transform: translateY(0); } }
+        .btn-enter { opacity: 0; animation: btnFlyIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+
+        .answer-btn {
+            background: #ffffff; border: 2px solid #e2e8f0; padding: 16px; border-radius: 22px;
+            font-weight: 700; font-size: 15px; color: #1e293b; width: 100%; margin: 0; 
+            transition: transform 0.15s ease, background 0.2s, border 0.2s, box-shadow 0.2s;
+            display: flex; align-items: center; justify-content: center; text-align: center;
+            line-height: 1.3; box-shadow: 0 4px 10px rgba(0,0,0,0.04); cursor: pointer; flex-shrink: 0;
+        }
+        .answer-btn:active { transform: scale(0.95); }
+        .answer-btn.correct-anim { background: #f0fdf4 !important; border-color: #4ade80 !important; color: #166534; box-shadow: 0 8px 25px rgba(34, 197, 94, 0.2); transform: scale(1.03); z-index: 5; }
+        .answer-btn.error-anim { background: #fef2f2 !important; border-color: #ef4444 !important; color: #991b1b; }
+
+        .catchable-flower { position: absolute; cursor: pointer; z-index: 50; padding: 15px; filter: drop-shadow(0 8px 15px rgba(0,0,0,0.25)); }
+
+        .progress-container { position: fixed; top: 125px; left: 50%; transform: translateX(-50%); width: 75%; max-width: 400px; height: 12px; background: rgba(255,255,255,0.7); border-radius: 20px; z-index: 10; border: 2px solid white; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+        #progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #7dd3fc, #38bdf8); border-radius: 20px; transition: width 0.6s ease; }
+        #game-ui { position: fixed; bottom: 35px; background: white; padding: 14px 35px; border-radius: 30px; font-weight: 800; font-size: 16px; display: none; z-index: 100; border: 2px solid var(--accent-blue); color: var(--accent-blue); box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+
+
+        /* ========= APPLE ОСТРОВОК С ИНТЕГРАЦИЕЙ MD3 ========= */
+        #island-master-container {
+            position: fixed; top: 15px; left: 0; width: 100%; display: flex; justify-content: center; align-items: flex-start;
+            z-index: 1000; pointer-events: none; font-family: 'Inter', sans-serif;
+            transform: translateY(-150px) scale(0.8); opacity: 0;
+            transition: transform 0.8s var(--ease-apple), opacity 0.8s;
+        }
+        #island-master-container.island-visible { transform: translateY(0) scale(1); opacity: 1; }
+
+        #main-pill {
+            pointer-events: auto; background: var(--island-bg); border: 0.5px solid var(--island-border);
+            width: 120px; height: 38px; border-radius: 19px; 
+            overflow: hidden; position: relative; color: white; cursor: pointer;
+            transition: all 0.5s var(--ease-apple);
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255,255,255,0.1);
+        }
+        #bubble-wrapper { width: 0px; margin-left: 0px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: width 0.5s var(--ease-apple), margin-left 0.5s var(--ease-apple); }
+        
+        #bubble-pill {
+            pointer-events: auto; background: var(--island-bg); border: 0.5px solid var(--island-border);
+            width: 58px; height: 58px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            opacity: 0; transform: scale(0.4); flex-shrink: 0;
+            transition: transform 0.5s var(--ease-apple), opacity 0.3s ease;
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255,255,255,0.1); overflow: hidden;
+            padding: 3px;
+        }
+
+        .island-content { position: absolute; inset: 0; display: flex; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+        .island-content.active { opacity: 1; pointer-events: auto; transition-delay: 0.2s; } 
+
+        .idle-content { justify-content: space-around; padding: 0 18px; width: 100%; }
+        .idle-dot { width: 7px; height: 7px; border-radius: 50%; background: #0ea5e9; box-shadow: 0 0 12px #0ea5e9; }
+        .idle-bar { width: 35px; height: 5px; border-radius: 10px; background: rgba(255,255,255,0.2); }
+
+        .music-wrapper { padding: 0 16px; width: 100%; display: flex; align-items: center; box-sizing: border-box; }
+        
+        /* ======== АНИМАЦИИ И ВИНИЛ МУЗЫКИ ======== */
+        @keyframes spin-art { to { transform: rotate(360deg); } }
+        
+        .art-box { 
+            position: relative; width: 54px; height: 54px; border-radius: 50%; overflow: hidden; flex-shrink: 0; 
+            border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+        }
+        .bubble-art-box { position: relative; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        
+        /* 👇👇👇 ИЗМЕНЕНИЯ ТУТ: ПОДКЛЮЧАЕТСЯ ВАША КАРТИНКА 👇👇👇 */
+        .art-bg { 
+            width: 100%; height: 100%; border-radius: 50%; background-size: cover; background-position: center; 
+            
+            background-image: url('обложка.jpeg'); /* 👈 ВПИШИТЕ НАЗВАНИЕ ВАШЕГО ФОТО ВМЕСТО "обложка.jpg" */
+            
+            background-color: #282828; /* Темный фон на время прогрузки картинки */
+            animation: spin-art 8s linear infinite; animation-play-state: paused; 
+        }
+        .art-bg.playing { animation-play-state: running; }
+
+        /* Внутренние кольца винила (тень MD3) */
+        .md3-vinyl-layer { 
+            position: absolute; inset: 0; border-radius: 50%; pointer-events: none; z-index: 4; 
+            background: radial-gradient(circle, rgba(0,0,0,0.05) 15%, transparent 25%, transparent 60%, rgba(0,0,0,0.4) 100%); 
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), inset 0 0 1.5px rgba(255,255,255,0.2); 
+        }
+        /* Отверстие граммофона в центре MD3 (сквозная дырочка) */
+        .md3-center-hole { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            width: 14px; height: 14px; border-radius: 50%; 
+            background-color: var(--island-bg);
+            border: 1.5px solid #282828; box-shadow: 0 0 0 1px rgba(255,255,255,0.08) inset; 
+            z-index: 5; pointer-events: none; 
+        }
+
+        .meta-text { flex: 1; margin-left: 14px; overflow: hidden; white-space: nowrap; }
+        .meta-text h4 { font-size: 15px; font-weight: 700; color: #fff; margin: 0; padding-bottom: 2px; text-overflow: ellipsis; overflow: hidden; }
+        .meta-text p { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.5); margin: 0; }
+        
+        .play-btn-circle { background: rgba(255,255,255,0.12); border: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; flex-shrink: 0; margin-right: 12px;}
+        .play-btn-circle:active { transform: scale(0.9); background: rgba(255,255,255,0.25); }
+        .viz-box { display: flex; align-items: flex-end; gap: 3.5px; height: 16px; flex-shrink: 0; }
+        .viz-bar { width: 3.5px; height: 4px; background: #0ea5e9; border-radius: 4px; transition: height 0.1s; }
+        .viz-box.playing .viz-bar { animation: viz-bounce 0.6s infinite alternate; }
+        @keyframes viz-bounce { 0% { height: 4px; } 100% { height: 16px; } }
+
+        /* ======== ОБНОВЛЕННАЯ НОТИФИКАЦИЯ ======== */
+        .notif-wrapper { 
+            padding: 0 16px 0 10px; width: 100%; height: 100%; display: flex; 
+            align-items: center; justify-content: flex-start; box-sizing: border-box; 
+        }
+        .notif-ring-box { padding: 3px; border-radius: 50%; transition: background 0.3s; margin-left: 2px; display: flex; flex-shrink: 0; background: #22c55e; align-self: center; }
+        .notif-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2.5px solid #000; }
+        
+        .notif-text { 
+            margin-left: 14px; flex: 1; display: flex; flex-direction: column; 
+            justify-content: center; overflow: hidden; max-height: 100%;
+        }
+        .notif-text-title { font-size: 12.5px; font-weight: 700; color: #94a3b8; display: block; line-height: 1; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } 
+        .notif-text-sub { 
+            font-size: 14.5px; 
+            font-weight: 600; 
+            color: #ffffff; 
+            white-space: normal; 
+            display: -webkit-box; 
+            -webkit-line-clamp: 3; 
+            -webkit-box-orient: vertical; 
+            overflow: hidden; 
+            line-height: 1.35; 
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="audio-player" preload="auto">
+        <source src="песенка.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="preloader">
+        <div style="width: 280px; height: 280px; position: relative;">
+            <svg id="svg-preloader" viewBox="0 0 200 240" width="100%" height="100%"></svg>
+        </div>
+        <div class="mt-6 font-pacifico text-2xl text-sky-600 animate-pulse drop-shadow-sm tracking-wide">
+            Собрание нежно-голубых облачков... <span id="percent-loader">0%</span>
+        </div>
+        <div class="w-56 h-3 bg-white rounded-full mt-4 overflow-hidden border-2 border-sky-100 shadow-inner">
+            <div id="loader-bar" class="h-full bg-sky-400 w-0 transition-all rounded-full"></div>
+        </div>
+    </div>
+
+
+    <div id="island-master-container">
+        <div id="main-pill" onclick="handleIslandClick()">
+            <div id="content-idle" class="island-content active idle-content"><div class="idle-dot"></div><div class="idle-bar"></div></div>
+            
+            <div id="content-music" class="island-content music-wrapper">
+                
+                <div class="art-box">
+                    <div class="art-bg" id="art-main"></div>
+                    <div class="md3-vinyl-layer"></div>
+                    <div class="md3-center-hole"></div>
+                </div>
+
+                <div class="meta-text">
+                    <h4 id="song-title">Falling Stars</h4>
+                    <p id="song-artist">Dvrst & polnalyubvi</p>
+                </div>
+                <button class="play-btn-circle" onclick="togglePlay(event)"><i data-lucide="play" id="play-icon" size="18"></i></button>
+                <div class="viz-box" id="visualizer">
+                    <div class="viz-bar" style="animation-delay: 0s;"></div><div class="viz-bar" style="animation-delay: 0.2s;"></div><div class="viz-bar" style="animation-delay: 0.1s;"></div>
+                </div>
+            </div>
+
+            <div id="content-notif" class="island-content notif-wrapper">
+                <div class="notif-ring-box" id="n-ring">
+                    <img class="notif-avatar" src="облачко.jpg" onerror="this.src='https://api.dicebear.com/7.x/notionists/svg?seed=Alisa&backgroundColor=b6e3f4'"/>
+                </div>
+                <div class="notif-text">
+                    <span id="n-title" class="notif-text-title">🧀</span>
+                    <span id="n-sub" class="notif-text-sub">А вот это место мы сделали очень длинным!</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="bubble-wrapper">
+            <div id="bubble-pill" onclick="handleIslandClick()">
+                <div class="bubble-art-box">
+                    <div class="art-bg" id="art-bubble"></div>
+                    <div class="md3-vinyl-layer"></div>
+                    <div class="md3-center-hole"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="bg-elements"></div>
+    <div class="progress-container"><div id="progress-bar"></div></div>
+    <div id="game-ui">Собрано: <span id="score">0</span> / 12 🦋</div>
+
+    <section id="stage-1" class="stage">
+        <div class="glass-container" style="justify-content: center; height: 100%; max-height: 480px;">
+            <div class="mx-auto mt-2 text-6xl mb-3 drop-shadow-md text-sky-400">🦋</div>
+            <h1 class="text-4xl md:text-5xl font-pacifico text-sky-500 mb-4 drop-shadow-sm">Алиса!</h1>
+            <p class="text-slate-600 mb-8 font-medium text-[15px] md:text-[16px] leading-relaxed px-1">С 8 Марта, любимая. Я как всегда  подготовил для тебя что-то типо подарка. тебе нужно ответить на 10 вопросов, чтобы перейти к подарочку ^^</p>
+            <button onclick="startGameEngine()" class="w-full bg-sky-500 hover:bg-sky-600 active:scale-95 text-white font-bold py-5 rounded-2xl shadow-xl transition-all uppercase tracking-widest flex items-center justify-center gap-2 mt-auto">
+                <span>Начать квест</span> <i data-lucide="sparkles" size="20"></i>
+            </button>
+        </div>
+    </section>
+
+    <section id="stage-2" class="stage">
+        <div class="glass-container pb-5">
+            <div class="flex items-center justify-center shrink-0">
+                <div class="bg-sky-100 text-sky-600 px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider mb-3 shadow-sm" id="q-count">Вопрос 1 из 10</div>
+            </div>
+            
+            <h2 id="q-title" class="text-[18px] md:text-[21px] font-bold mb-5 text-slate-800 leading-snug shrink-0">Заголовок</h2>
+            
+            <div id="q-options">
+                </div>
+        </div>
+    </section>
+
+    <section id="stage-3" class="stage justify-center">
+        <div class="text-center pointer-events-none drop-shadow-lg glass-container border-2 max-h-40" style="justify-content: center; margin-top:0;">
+            <h2 class="text-3xl font-pacifico text-sky-500 mb-2">Лови пионы!</h2>
+            <p class="text-slate-600 font-bold leading-relaxed">Тапай и собирай нежно-голубые бутоны 🦋</p> 
+        </div>
+    </section>
+
+    <section id="stage-4" class="stage">
+        <div class="glass-container w-[95%] overflow-hidden" style="max-height: 90vh;">
+            
+            <div class="mx-auto flex justify-center w-full my-2 drop-shadow-lg" style="height: 200px;">
+                <svg id="svg-final" viewBox="0 0 200 240" width="100%" height="100%"></svg>
+            </div>
+            
+            <h2 class="text-3xl font-pacifico text-sky-500 mb-2 mt-2 drop-shadow-sm">Теперь это твои Пионы!</h2>
+            <div class="space-y-2 text-slate-700 font-medium mb-5 leading-snug text-[14px]">
+                <p>Алиса я тебя очень сильно поздравляю</p>
+                <p>Желаю бесконечной радости, <b>Тепла</b> и улыбки, которой я сегодня тебе принёс, Ты лучшая!❤️‍🩹</p>
+            </div>
+            
+            <div class="bg-sky-50 p-4 rounded-2xl border-4 border-dashed border-sky-200 shrink-0 mx-2">
+                <p class="font-black text-sky-800 tracking-tighter text-[19px] leading-none">#ЯЛЮБЛЮТЕБЯ</p>
+                <p class="text-[12px] mt-2 text-sky-600 italic font-bold">P.S. Я безумно тебя люблю и это не угаснет никогда ;) ☁️💙</p>
+            </div>
+        </div>
+    </section>
+
+
+    <script>
+        lucide.createIcons();
+
+        // ======= ГЕНЕРАТОР ПИОНОВ =======
+        function buildPeonyBouquet(svgId, isAnimated) {
+            const svg = document.getElementById(svgId);
+            if(!svg) return;
+            
+            let html = '';
+            
+            // Фон для букета
+            html += '<path d="M 40 110 Q 100 290 160 110 Q 100 135 40 110" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>';
+            html += '<path d="M 35 100 L 100 240 L 165 100 Q 100 130 35 100" fill="#f1f5f9"/>';
+
+            // Генерируем стебли и листья
+            let stemHTML = '';
+            for(let i=0; i<30; i++) { 
+                let eX = 30 + Math.random() * 140; 
+                let eY = 15 + Math.random() * 95;
+                let cX = 100 + (Math.random() - 0.5) * 60; 
+                let cY = 130 + (Math.random() - 0.5) * 20;
+                
+                let cClass = isAnimated ? 'class="stem-anim" style="opacity: 0;"' : '';
+                stemHTML += `<path ${cClass} d="M 100 160 Q ${cX} ${cY} ${eX} ${eY}" fill="none" stroke="#64748b" stroke-width="1.8"/>`;
+                
+                // Добавляем листья
+                if (Math.random() > 0.4) {
+                    let lX = cX + (Math.random() - 0.5) * 20;
+                    let lY = cY + (Math.random() - 0.5) * 20;
+                    stemHTML += `<ellipse ${cClass} cx="${lX}" cy="${lY}" rx="8" ry="12" fill="#94a3b8" transform="rotate(${Math.random()*360} ${lX} ${lY})"/>`;
+                }
+            }
+            html += stemHTML;
+
+            // Генерируем бутоны пионов
+            let budHTML = '';
+            const pColors =['#ffffff', '#f0f9ff', '#e0f2fe', '#bae6fd', '#b9eafb', '#e0f2fe'];
+            for(let i=0; i<45; i++) { 
+                let posX = 20 + Math.random() * 160; 
+                let posY = 10 + Math.random() * 100;
+                
+                let dist = Math.sqrt((posX-100)**2 + (posY-70)**2);
+                if(dist > 70 + (Math.random()*10)) continue; 
+
+                let color = pColors[Math.floor(Math.random() * pColors.length)];
+                let radius = 6 + Math.random() * 14;
+                let opacity = 0.85 + Math.random()*0.15;
+                
+                let cClass = isAnimated ? 'class="bud-anim" style="opacity: 0; transform-origin: '+posX+'px '+posY+'px;"' : '';
+                
+                // Генерируем несколько слоев лепестков для пышности
+                for (let j=0; j<3; j++) {
+                   let rPetal = radius * (1 - j*0.2);
+                   budHTML += `<circle ${cClass} cx="${posX}" cy="${posY}" r="${rPetal}" fill="${color}" opacity="${opacity}" filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.1))"/>`;
+                }
+            }
+            html += budHTML;
+            
+            // Генерируем бант
+            let bowOpacity = isAnimated ? 'class="bow-anim" style="opacity:0;"' : '';
+            html += `<g ${bowOpacity}>`;
+            html += '<path d="M 100 160 Q 55 135 45 165 C 40 190 85 175 100 165 Z" fill="#bbf7d0"/>';
+            html += '<path d="M 100 160 Q 145 135 155 165 C 160 190 115 175 100 165 Z" fill="#bbf7d0"/>';
+            html += '<path d="M 100 165 Q 75 200 70 225 L 95 220 Z" fill="#4ade80"/>';
+            html += '<path d="M 100 165 Q 125 200 130 225 L 105 220 Z" fill="#4ade80"/>';
+            html += '<circle cx="100" cy="165" r="9" fill="#22c55e"/>';
+            html += '</g>';
+            
+            svg.innerHTML = html;
+        }
+
+
+        // ======= ЛОГИКА ДИНАМИЧЕСКОГО ОСТРОВА (СУПЕР БЕЗОПАСНАЯ ГЕОМЕТРИЯ) =======
+        const MasterBox = document.getElementById('island-master-container');
+        const Pill = document.getElementById('main-pill');
+        const BubbleWrap = document.getElementById('bubble-wrapper');
+        const Bubble = document.getElementById('bubble-pill');
+        const AudioPlayer = document.getElementById('audio-player');
+        let currentIslandState = 'idle'; let splitTimer = null;
+
+        function updateIslandUI(mode) {
+            currentIslandState = mode;
+            document.querySelectorAll('.island-content').forEach(el => el.classList.remove('active'));
+
+            if (mode === 'idle') {
+                Pill.style.width = '120px'; Pill.style.height = '38px'; Pill.style.borderRadius = '19px';
+                BubbleWrap.style.width = '0px'; BubbleWrap.style.marginLeft = '0px'; Bubble.style.transform = 'scale(0.3)'; Bubble.style.opacity = '0';
+                document.getElementById('content-idle').classList.add('active');
+            } else if (mode === 'music') {
+                Pill.style.width = '335px'; Pill.style.height = '82px'; Pill.style.borderRadius = '41px';
+                BubbleWrap.style.width = '0px'; BubbleWrap.style.marginLeft = '0px'; Bubble.style.transform = 'scale(0.3)'; Bubble.style.opacity = '0';
+                document.getElementById('content-music').classList.add('active');
+            } else if (mode === 'notif') {
+                // 👇 ГЛАВНОЕ: ТА САМАЯ ИЗМЕНЁННАЯ КАПСУЛА НА 96px, КУДА ТОЧНО ВМЕСТЯТСЯ ВСЕ 3 СТРОКИ С ОТСТУПОМ 👇
+                Pill.style.width = '295px';       // Более широкая капсула 
+                Pill.style.height = '96px';       // ТЕПЕРЬ С ЖЕСТКОЙ ВЫСОТОЙ (Выше, чем раньше!) В нее всё идеально входит
+                Pill.style.borderRadius = '32px'; 
+                BubbleWrap.style.width = '58px'; 
+                BubbleWrap.style.marginLeft = '10px'; Bubble.style.transform = 'scale(1)'; Bubble.style.opacity = '1';      
+                document.getElementById('content-notif').classList.add('active');
+            }
+        }
+
+        function handleIslandClick() {
+            if (currentIslandState === 'idle') updateIslandUI('music');
+            else if (currentIslandState === 'music' && AudioPlayer.paused) updateIslandUI('idle');
+        }
+
+        function triggerNotification(isSuccess, subtitleTxt) {
+            clearTimeout(splitTimer);
+            document.getElementById('n-sub').innerText = subtitleTxt;
+            let ringBox = document.getElementById('n-ring');
+            
+            if (isSuccess) ringBox.style.background = 'linear-gradient(135deg, #38bdf8, #0ea5e9)'; 
+            else ringBox.style.background = 'linear-gradient(135deg, #f43f5e, #be123c)';
+
+            updateIslandUI('notif');
+            // Теперь Держим плашку с сообщением АЖ 3.5 Секунды (чтоб успеть всё-всё прочесть)
+            splitTimer = setTimeout(() => { updateIslandUI('music'); }, 3500); 
+        }
+
+        function togglePlay(event) {
+            if (event) event.stopPropagation();
+            if (AudioPlayer.paused) { AudioPlayer.play(); updateAudioVisuals(true); } 
+            else { AudioPlayer.pause(); updateAudioVisuals(false); }
+        }
+
+        function updateAudioVisuals(isPlaying) {
+            const pIco = document.getElementById('play-icon'); const viz = document.getElementById('visualizer');
+            const am = document.getElementById('art-main'); const ab = document.getElementById('art-bubble');
+            if(isPlaying) { pIco.setAttribute('data-lucide', 'pause'); viz.classList.add('playing'); am.classList.add('playing'); ab.classList.add('playing'); } 
+            else { pIco.setAttribute('data-lucide', 'play'); viz.classList.remove('playing'); am.classList.remove('playing'); ab.classList.remove('playing'); }
+            lucide.createIcons();
+        }
+
+        // ========= БАЗА ВОПРОСОВ =========
+        let curQIdx = 0; let totalScore = 0; const targetFlowers = 12;
+        const Quests =[
+            { q: "Что доставляет тебе самое большое удовольствие?", options:[ { t: "Общение со мной", corr: true }, { t: "Рано вставать ⏰", corr: false }, { t: "Играть в кирку ", corr: true } ]},
+            { q: "Что из этого чистая правда о нас?", options:[ { t: "Ляшками можно задушить 🥰", corr: true }, { t: "Ты счастливее всех ✨", corr: true }, { t: "Вообще не кушаем 🍿", corr: false } ]},
+            { q: "Насколько сильно я тебя люблю?", options:[ { t: "Обычненько", corr: false }, { t: "Больше всех в мире ❤️", corr: true } ]},
+            { q: "Ты счастлива сегодня?", options:[ { t: "Нет(", corr: false }, { t: "Очень 🥰", corr: true } ]},
+            { q: "Какой мой любимый цвет?", options:[ { t: "Голубые 💙", corr: false }, { t: "Фиолетовый 💜", corr: true }, { t: "Красный🩸", corr: false } ]},
+            { q: "Любииииишь обнимашки?", options:[ { t: "Конеечноо 🦋", corr: true }, { t: "нет", corr: false } ]},
+            { q: "Я буду зол если ты не будешь кушать?", options:[ { t: "Правда😖", corr: true }, { t: "не правда 🥀", corr: false } ]},
+            { q: "Уже устала от моих тестов?", options:[ { t: "Есть немножко 😅", corr: true }, { t: "Продолжай!", corr: true } ]},
+            { q: "Вниманиеее", options:[ { t: "Я готова", corr: true }, { t: "Не жду", corr: false } ]},
+            { q: "Ну всё, переходим к следующему?", options:[ { t: "Конечно ДААААА! 💐", corr: true } ]}
+        ];
+
+        // ============ ЛОГИКА ИГРЫ ============
+        function startGameEngine() {
+            updateIslandUI('music'); 
+            let p = AudioPlayer.play();
+            if (p !== undefined) p.then(()=>updateAudioVisuals(true)).catch(e=>{});
+            changeScene(1, 2); generateQuestionUI();
+        }
+
+        function generateQuestionUI() {
+            const QA = Quests[curQIdx];
+            document.getElementById('q-count').innerText = `Вопрос ${curQIdx+1} из ${Quests.length}`;
+            document.getElementById('q-title').innerText = QA.q;
+            
+            const Wrap = document.getElementById('q-options'); Wrap.innerHTML = '';
+            document.getElementById('progress-bar').style.width = ((curQIdx / Quests.length) * 50) + '%'; 
+
+            QA.options.forEach((opts, n) => {
+                const btn = document.createElement('button'); btn.className = 'answer-btn btn-enter'; 
+                btn.style.animationDelay = (n * 0.12) + 's'; btn.innerText = opts.t;
+                btn.onclick = () => onBtnClicked(opts.corr, btn); Wrap.appendChild(btn);
+            });
+        }
+
+        function onBtnClicked(isValid, el) {
+            Array.from(el.parentNode.children).forEach(btn => btn.style.pointerEvents = 'none');
+            if(isValid) {
+                el.classList.add('correct-anim');
+                
+                // ВОТ ДОБАВИЛ МЕГA ДЛИННЫЙ ТЕКСТ (в 3 строчки ложится идеально благодаря увеличенной до 96px капсуле)
+                let positiveLines =[
+                    'умничкаа 🥹',
+                    'я люблю тебя 💋', 
+                    'всё абсолютно точно! Алиса💙', 
+                    'умничка, ну как же хорошо справляешься! 🦋'
+                ];
+                triggerNotification(true, positiveLines[Math.floor(Math.random()*positiveLines.length)]);
+                
+                setTimeout(() => {
+                    curQIdx++;
+                    if(curQIdx < Quests.length) generateQuestionUI(); else changeScene(2, 3);
+                }, 2200); 
+
+            } else {
+                el.classList.add('error-anim');
+                // Так же здесь (Очень длинное)
+                let angryLines =[
+                    'абсолютно не туда жмешь, переделывай! Подумай-ка 🙈',
+                    'я негодую 😡! Ответ оказался совершенно не тот! пробуй еще! ',
+                    'Алиса, думай пожалуйста! 🥺'
+                ];
+                triggerNotification(false, angryLines[Math.floor(Math.random()*angryLines.length)]);
+                gsap.fromTo(el, {x:0}, {x:-10, yoyo:true, repeat:3, duration:0.08, clearProps: "x"});
+                
+                setTimeout(() => { el.classList.remove('error-anim'); Array.from(el.parentNode.children).forEach(b => b.style.pointerEvents='auto'); }, 1400);
+            }
+        }
+
+        function changeScene(fromStageNum, toStageNum) {
+            const S1 = document.getElementById('stage-'+fromStageNum);
+            const S2 = document.getElementById('stage-'+toStageNum);
+            
+            gsap.to(S1, {opacity: 0, duration: 0.3, onComplete: () => {
+                S1.classList.remove('active'); S2.classList.add('active'); S2.style.opacity = '0';
+                gsap.to(S2, {opacity: 1, duration: 0.4});
+                
+                if (toStageNum === 3) { document.getElementById('progress-bar').style.width = '75%'; triggerNotification(true, 'Тебе осталось только Схватить все летящие бутоны пионов! 🦋🌸'); startFlowerSpawner(); }
+                if (toStageNum === 4) { 
+                    document.getElementById('progress-bar').style.width = '100%'; 
+                    triggerNotification(true, 'Поздравляю! Ты официально обладательница этого небесного облака! 💐'); 
+                    document.getElementById('game-ui').style.display = 'none';
+                    buildPeonyBouquet('svg-final', false); 
+                    confettiMegaBoom(); 
+                }
+            }});
+        }
+
+        function startFlowerSpawner() {
+            document.getElementById('game-ui').style.display = 'block';
+            let loopId = setInterval(() => {
+                if(totalScore >= targetFlowers || !document.getElementById('stage-3').classList.contains('active')) return clearInterval(loopId);
+
+                let flo = document.createElement('div'); flo.className = 'catchable-flower';
+                // Визуализация пиона для сбора
+                let svgContent = `<svg width="85" height="85" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="30" fill="#bae6fd" opacity="0.8" />
+                    <circle cx="50" cy="50" r="22" fill="#e0f2fe" opacity="0.9" />
+                    <circle cx="50" cy="50" r="14" fill="#ffffff" />
+                    <path d="M 50 80 Q 55 95 50 100 M 50 85 Q 40 90 35 95 M 50 85 Q 60 90 65 95" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+                </svg>`;
+                
+                flo.innerHTML = svgContent;
+
+                flo.style.left = 5 + Math.random()*75 + '%'; flo.style.top = '-90px'; document.getElementById('stage-3').appendChild(flo);
+                const grav = gsap.to(flo, { y: window.innerHeight+120, rotation: -90+Math.random()*180, duration: 4+Math.random()*1.5, ease: "none", onComplete:()=>flo.remove()});
+                
+                flo.onpointerdown = function(e) {
+                    const touchDiv = document.createElement('div'); touchDiv.innerText="🦋"; touchDiv.style.position="fixed"; touchDiv.style.left=e.clientX+"px"; touchDiv.style.top=e.clientY+"px"; touchDiv.style.pointerEvents="none"; touchDiv.style.zIndex="9000"; document.body.appendChild(touchDiv); gsap.to(touchDiv, {y:"-=50", opacity:0, duration:0.8, onComplete:()=>touchDiv.remove()});
+                    totalScore++; document.getElementById('score').innerText = totalScore;
+                    grav.kill();
+                    if(totalScore === 6) triggerNotification(true, 'Уже собрана ровно половина 🌸');
+                    
+                    gsap.to(flo, {scale: 2, opacity: 0, duration: 0.25, onComplete:()=>flo.remove()});
+                    if (totalScore >= targetFlowers) setTimeout(()=>changeScene(3, 4), 500);
+                }
+            }, 650); 
+        }
+
+        function confettiMegaBoom() {
+            for (let i = 0; i < 70; i++) {
+                const par = document.createElement('div'); par.style.position = 'fixed'; let s = Math.random()*12+6; par.style.width = s+'px'; par.style.height = s+'px'; par.style.borderRadius = '50%';
+                par.style.background =['#bae6fd','#7dd3fc','#e0f2fe','#ffffff','#38bdf8'][Math.floor(Math.random()*5)];
+                par.style.top = '-30px'; par.style.left = Math.random()*100+'vw'; par.style.zIndex = '9900'; document.body.appendChild(par);
+                gsap.to(par, {y: window.innerHeight+60, x: (Math.random()-0.5)*350, rotation: 500, duration: 2+Math.random()*3, ease: "power1.in", onComplete:()=>par.remove() });
+            }
+        }
+
+        window.onload = () => {
+            AudioPlayer.volume = 0.5;
+            
+            const bgContainer = document.getElementById('bg-elements');
+            for(let i=0; i<15; i++) {
+                let crc = document.createElement('div'); 
+                let cl =['#ffffff', '#bae6fd', '#e0f2fe'][Math.floor(Math.random()*3)];
+                crc.style.cssText = `position:absolute; width:${10+Math.random()*25}px; height:${10+Math.random()*25}px; border-radius:50%; background:${cl}; opacity:0.35; filter:blur(4px); top:${Math.random()*100}%; left:${Math.random()*100}%;`;
+                bgContainer.appendChild(crc); gsap.to(crc, {y:"-=80", x:"+=30", duration:4+Math.random()*4, repeat:-1, yoyo:true, ease:"sine.inOut" });
+            }
+
+            buildPeonyBouquet('svg-preloader', true);
+
+            let pt = gsap.timeline({
+                onUpdate: function() { 
+                    let pg = Math.round(this.progress() * 100); 
+                    document.getElementById('percent-loader').innerText = pg + '%'; document.getElementById('loader-bar').style.width = pg + '%'; 
+                },
+                onComplete: () => {
+                    gsap.to('#preloader', {opacity: 0, duration: 0.7, onComplete:() => {
+                        document.getElementById('preloader').remove();
+                        document.getElementById('stage-1').classList.add('active');
+                        MasterBox.classList.add('island-visible');
+                        updateIslandUI('idle');
+                    }});
+                }
+            });
+
+            pt.to('#svg-preloader .stem-anim', {opacity: 1, duration: 0.15, stagger: 0.02});
+            pt.fromTo('#svg-preloader .bud-anim', {opacity:0, scale:0.3}, {opacity: 1, scale:1, duration: 0.3, stagger: 0.003, ease:"back.out(2)"}, "-=0.2");
+            pt.to('#svg-preloader .bow-anim', {opacity: 1, duration: 0.4}, "+=0.3");
+        }
+    </script>
+</body>
+</html>
